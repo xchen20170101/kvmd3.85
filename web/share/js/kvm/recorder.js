@@ -45,6 +45,7 @@ export function Recorder() {
 		tools.el.setOnClick($("hid-recorder-stop"), __stopProcess);
 		tools.el.setOnClick($("hid-recorder-play"), __playRecord);
 		tools.el.setOnClick($("hid-recorder-clear"), __clearRecord);
+		tools.el.setOnClick($("hid-recorder-netstat"), __setNetstat);
 
 		$("hid-recorder-new-script-file").onchange = __uploadScript;
 		tools.el.setOnClick($("hid-recorder-upload"), () => $("hid-recorder-new-script-file").click());
@@ -113,6 +114,25 @@ export function Recorder() {
 		}
 		__refresh();
 	};
+
+	var __setNetstat = function() {
+		let address = $("hid-network-input-address").value
+		let gateway = $("hid-network-input-gateway").value
+		let dns = $("hid-network-input-dns").value
+		// let body = {
+		// 	"address": $("hid-network-input-address").value,
+		// 	"gateway": $("hid-network-input-gateway").value,
+		// 	"dns": $("hid-network-input-dns").value
+		// }
+		let url = "/api/netstat?address=" + address + "&gateway=" + gateway + "&dns=" + dns
+		let http = tools.makeRequest("POST", url, function() {
+			if (http.readyState === 4) {
+				if (http.status !== 200) {
+					wm.error("HID reset error:<br>", http.responseText);
+				}
+			}
+		});
+	}
 
 	var __playRecord = function() {
 		__play_timer = setTimeout(() => __runEvents(0), 0);
@@ -306,12 +326,30 @@ export function Recorder() {
 		tools.el.setEnabled($("hid-recorder-download"), (!__play_timer && !__recording && __events.length));
 
 		__setCounters(__events.length, __events_time);
+		__getNetConfig();
 	};
 
 	var __setCounters = function(events_count, events_time) {
 		$("hid-recorder-time").innerHTML = tools.formatDuration(events_time);
 		$("hid-recorder-events-count").innerHTML = events_count;
 	};
+
+	var __getNetConfig = function() {
+		let http = tools.makeRequest("GET", "/api/netstat", function() {
+			if (http.readyState === 4) {
+				if (http.status !== 200) {
+					wm.error("HID reset error:<br>", http.responseText);
+				}
+			}
+			let info = JSON.parse(http.responseText).result;
+			$("hid-network-input-name").value = info.Name;
+			$("hid-network-input-address").value = info.Address;
+			$("hid-network-input-gateway").value = info.Gateway;
+			$("hid-network-input-dns").value = info.DNS;
+		});
+
+		
+	}
 
 	__init__();
 }

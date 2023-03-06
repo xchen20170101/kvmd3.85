@@ -50,6 +50,61 @@ class InfoApi:
             for field in fields
         ])))
         return make_json_response(results)
+    
+    @exposed_http("GET", "/netstat")
+    async def __common_get_netstat(self, request: Request) -> Response:
+        import subprocess
+        status, data = subprocess.getstatusoutput('netcfg')
+        if status == 0:
+            res = self.__parse_netcfg(data)
+        else:
+            res = {}
+        return make_json_response(
+            res
+        )
+    
+    @exposed_http("POST", "/netstat")
+    async def __common_set_netstat(self, request: Request) -> Response:
+        data = {}
+        import os
+        import subprocess
+        try:
+            address, mask = request.query.get('address').split('/')
+            command = "sudo netcfg ip {}".format(address)
+            status, res = subprocess.getstatusoutput(command)
+            command = "sudo netcfg mask {}".format(self.__exchange_maskint(int(mask)))
+            status, res = subprocess.getstatusoutput(command)
+            command = "sudo netcfg gw {}".format(request.query.get('gateway'))
+            status, res = subprocess.getstatusoutput(command)
+            command = "sudo netcfg dns {}".format(request.query.get('dns'))
+            status, res = subprocess.getstatusoutput(command)
+            data['status'] = status
+            data['res'] = res
+        except Exception as e:
+            data['error'] = str(e)
+        return make_json_response(data)
+    
+    def __exchange_maskint(self, mask_int):
+        bin_arr = ['0' for i in range(32)]
+        for i in range(mask_int):
+            bin_arr[i] = '1'
+        tmp_mask = [''.join(bin_arr[i*8: i*8 + 8]) for i in range(4)]
+        tmp_mask = [str(int(tmpstr, 2)) for tmpstr in tmp_mask]
+        return '.'.join(tmp_mask)
+
+    def __parse_netcfg(self, data):
+        res = {
+            'Name': '',
+            'Address': '',
+            'Gateway': '',
+            'DNS': ''
+        }
+        items = data.split('\n')
+        for item in items:
+            for key in list(res.keys()):
+                if item.startswith(key):
+                    res[key] = item.split('=')[1]
+        return res
 
     def __valid_info_fields(self, request: Request) -> List[str]:
         subs = self.__info_manager.get_subs()
